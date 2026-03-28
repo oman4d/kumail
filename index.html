@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>الصف التفاعلي</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <header class="hero">
+      <div>
+        <div class="credit-line">تطوير أ. كميل الكشري</div>
+        <h1>الصف التفاعلي</h1>
+        <p>اختر الشعبة والدرس، ثم دوّر العجلة لاختيار الطالب، وبعدها سيظهر السؤال العشوائي مباشرة.</p>
+      </div>
+      <button id="resetAllBtn" class="ghost-btn">إعادة ضبط كاملة</button>
+    </header>
+
+    <section class="panel controls-panel">
+      <div class="control-group">
+        <label for="classSelect">الشعبة</label>
+        <select id="classSelect">
+          <option value="">اختر الشعبة</option>
+        </select>
+      </div>
+
+      <div class="control-group">
+        <label for="lessonSelect">عنوان الدرس</label>
+        <select id="lessonSelect">
+          <option value="">اختر الدرس</option>
+        </select>
+      </div>
+
+      <div class="control-group button-row">
+        <button id="spinBtn" class="primary-btn">ابدأ العجلة</button>
+        <button id="newQuestionBtn" class="secondary-btn" disabled>سؤال آخر</button>
+        <button id="nextStudentBtn" class="secondary-btn" disabled>طالب آخر</button>
+      </div>
+    </section>
+
+    <main class="main-grid">
+      <section class="panel wheel-panel">
+        <div class="panel-header">
+          <h2>العجلة الدوارة</h2>
+          <span id="wheelStatus" class="status-badge">جاهز</span>
+        </div>
+        <div class="wheel-wrap">
+          <div class="pointer"></div>
+          <canvas id="wheelCanvas" width="520" height="520"></canvas>
+        </div>
+        <div class="selected-student-card">
+          <div class="mini-label">الطالب المختار</div>
+          <div id="selectedStudentName" class="selected-student-name">—</div>
+        </div>
+      </section>
+
+      <section class="panel question-panel">
+        <div class="panel-header">
+          <h2>السؤال العشوائي</h2>
+          <div class="question-header-tools">
+            <div id="timerWrap" class="timer-wrap hidden">
+              <svg class="timer-svg" viewBox="0 0 120 120">
+                <circle class="timer-track" cx="60" cy="60" r="52"></circle>
+                <circle id="timerProgress" class="timer-progress" cx="60" cy="60" r="52"></circle>
+              </svg>
+              <div id="timerText" class="timer-text">30</div>
+            </div>
+            <span id="lessonBadge" class="status-badge muted">لم يتم اختيار درس بعد</span>
+          </div>
+        </div>
+
+        <div id="questionBox" class="question-box hidden">
+          <h3 id="questionText" class="question-text"></h3>
+          <div id="optionsContainer" class="options-grid"></div>
+          <div id="feedbackBox" class="feedback-box">اختر الإجابة الصحيحة.</div>
+        </div>
+
+        <div id="emptyQuestionState" class="empty-state"></div>
+      </section>
+    </main>
+  </div>
+
+  <script src="students.js"></script>
+  <script src="questions-lesson-01.js"></script>
+  <script src="questions-lesson-02.js"></script>
+  <script src="questions-lesson-03.js"></script>
+  <script src="questions-lesson-04.js"></script>
+  <script src="questions-lesson-05.js"></script>
+  <script src="questions-lesson-06.js"></script>
+  <script src="questions-lesson-07.js"></script>
+  <script src="questions-lesson-08.js"></script>
+  <script src="questions-lesson-09.js"></script>
+  <script src="questions-lesson-10.js"></script>
+  <script src="questions-lesson-11.js"></script>
+  <script src="questions-lesson-12.js"></script>
+  <script src="questions-lesson-13.js"></script>
+  <script src="questions-lesson-14.js"></script>
+  <script src="questions-lesson-15.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
