@@ -3,21 +3,28 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>الصف التفاعلي</title>
+  <title>عجلة الصف التاسع</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <div class="app-shell">
     <header class="hero">
       <div>
-        <div class="credit-line">تطوير أ. كميل الكشري</div>
-        <h1>الصف التفاعلي</h1>
-        <p>اختر الشعبة والدرس، ثم دوّر العجلة لاختيار الطالب، وبعدها سيظهر السؤال العشوائي مباشرة.</p>
+        <h1>عجلة الصف التاسع</h1>
+        <p>اختر الفصل الدراسي والشعبة والدرس، ثم دوّر العجلة لاختيار الطالب، وبعدها سيظهر سؤال عشوائي.</p>
       </div>
       <button id="resetAllBtn" class="ghost-btn">إعادة ضبط كاملة</button>
     </header>
 
     <section class="panel controls-panel">
+      <div class="control-group">
+        <label for="semesterSelect">الفصل الدراسي</label>
+        <select id="semesterSelect">
+          <option value="">اختر الفصل الدراسي</option>
+          <option value="1">الفصل الدراسي الأول</option>
+          <option value="2">الفصل الدراسي الثاني</option>
+        </select>
+      </div>
       <div class="control-group">
         <label for="classSelect">الشعبة</label>
         <select id="classSelect">
@@ -27,8 +34,8 @@
 
       <div class="control-group">
         <label for="lessonSelect">عنوان الدرس</label>
-        <select id="lessonSelect">
-          <option value="">اختر الدرس</option>
+        <select id="lessonSelect" disabled>
+          <option value="">اختر الفصل الدراسي أولاً</option>
         </select>
       </div>
 
@@ -58,30 +65,46 @@
       <section class="panel question-panel">
         <div class="panel-header">
           <h2>السؤال العشوائي</h2>
-          <div class="question-header-tools">
-            <div id="timerWrap" class="timer-wrap hidden">
-              <svg class="timer-svg" viewBox="0 0 120 120">
-                <circle class="timer-track" cx="60" cy="60" r="52"></circle>
-                <circle id="timerProgress" class="timer-progress" cx="60" cy="60" r="52"></circle>
-              </svg>
-              <div id="timerText" class="timer-text">30</div>
-            </div>
-            <span id="lessonBadge" class="status-badge muted">لم يتم اختيار درس بعد</span>
-          </div>
+          <span id="lessonBadge" class="status-badge muted">لم يتم اختيار درس بعد</span>
         </div>
 
         <div id="questionBox" class="question-box hidden">
+          <div class="question-meta">
+            <span id="questionCounter">السؤال</span>
+            <span id="questionTypeBadge" class="type-badge">اختيار من متعدد</span>
+          </div>
           <h3 id="questionText" class="question-text"></h3>
           <div id="optionsContainer" class="options-grid"></div>
           <div id="feedbackBox" class="feedback-box">اختر الإجابة الصحيحة.</div>
         </div>
 
-        <div id="emptyQuestionState" class="empty-state"></div>
+        <div id="emptyQuestionState" class="empty-state">
+          <p>بعد اختيار الطالب من العجلة سيظهر هنا سؤال عشوائي من الدرس المحدد.</p>
+        </div>
       </section>
     </main>
   </div>
 
   <script src="students.js"></script>
+  <script src="s1-questions-lesson-01.js"></script>
+  <script src="s1-questions-lesson-02.js"></script>
+  <script src="s1-questions-lesson-03.js"></script>
+  <script src="s1-questions-lesson-04.js"></script>
+  <script src="s1-questions-lesson-05.js"></script>
+  <script src="s1-questions-lesson-06.js"></script>
+  <script src="s1-questions-lesson-07.js"></script>
+  <script src="s1-questions-lesson-08.js"></script>
+  <script src="s1-questions-lesson-09.js"></script>
+  <script src="s1-questions-lesson-10.js"></script>
+  <script src="s1-questions-lesson-11.js"></script>
+  <script src="s1-questions-lesson-12.js"></script>
+  <script src="s1-questions-lesson-13.js"></script>
+  <script src="s1-questions-lesson-14.js"></script>
+  <script src="s1-questions-lesson-15.js"></script>
+  <script src="s1-questions-lesson-16.js"></script>
+  <script src="s1-questions-lesson-17.js"></script>
+  <script src="s1-questions-lesson-18.js"></script>
+  <script src="s1-questions-lesson-19.js"></script>
   <script src="questions-lesson-01.js"></script>
   <script src="questions-lesson-02.js"></script>
   <script src="questions-lesson-03.js"></script>

@@ -47,12 +47,6 @@ body {
   margin-bottom: 18px;
 }
 
-.credit-line {
-  font-size: 0.85rem;
-  color: var(--muted);
-  margin-bottom: 6px;
-}
-
 .hero h1 {
   margin: 0 0 10px;
   font-size: 2rem;
@@ -159,18 +153,13 @@ button:disabled {
   margin-bottom: 14px;
 }
 
-.question-header-tools {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-}
-
 .panel-header h2 {
   margin: 0;
   font-size: 1.35rem;
 }
 
-.status-badge {
+.status-badge,
+.type-badge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -179,6 +168,9 @@ button:disabled {
   font-size: 0.95rem;
   font-weight: 700;
   white-space: nowrap;
+}
+
+.status-badge {
   background: #e8f0fb;
   color: var(--text);
 }
@@ -186,48 +178,6 @@ button:disabled {
 .status-badge.muted {
   background: #f0f4f8;
   color: var(--muted);
-}
-
-.timer-wrap {
-  position: relative;
-  width: 72px;
-  height: 72px;
-}
-
-.timer-svg {
-  width: 72px;
-  height: 72px;
-  transform: rotate(-90deg);
-}
-
-.timer-track,
-.timer-progress {
-  fill: none;
-  stroke-width: 8;
-}
-
-.timer-track {
-  stroke: #e5edf8;
-}
-
-.timer-progress {
-  stroke: var(--primary);
-  stroke-linecap: round;
-  transition: stroke-dashoffset 0.8s linear, stroke 0.2s ease;
-}
-
-.timer-wrap.warning .timer-progress {
-  stroke: #ef4444;
-}
-
-.timer-text {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  font-weight: 800;
-  font-size: 1.1rem;
-  color: var(--text);
 }
 
 .wheel-wrap {
@@ -297,7 +247,18 @@ button:disabled {
 }
 
 .empty-state {
+  display: grid;
+  place-items: center;
+  text-align: center;
+  color: var(--muted);
   min-height: 320px;
+}
+
+.question-meta {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
 }
 
 .question-text {
@@ -406,18 +367,10 @@ button:disabled {
   .button-row button {
     width: 100%;
   }
+}
 
-  .question-header-tools {
-    gap: 8px;
-  }
-
-  .timer-wrap {
-    width: 62px;
-    height: 62px;
-  }
-
-  .timer-svg {
-    width: 62px;
-    height: 62px;
-  }
+/* اختيار الفصل الدراسي */
+select:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
 }

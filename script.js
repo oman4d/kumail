@@ -1,6 +1,7 @@
-const lessonsData = collectLessons();
+const lessonsData = collectLessons(); // { "1": [...], "2": [...] }
 const classesData = window.CLASSROOMS_DATA || {};
 
+const semesterSelect = document.getElementById("semesterSelect");
 const classSelect = document.getElementById("classSelect");
 const lessonSelect = document.getElementById("lessonSelect");
 const spinBtn = document.getElementById("spinBtn");
@@ -12,22 +13,16 @@ const wheelStatus = document.getElementById("wheelStatus");
 const lessonBadge = document.getElementById("lessonBadge");
 const questionBox = document.getElementById("questionBox");
 const emptyQuestionState = document.getElementById("emptyQuestionState");
+const questionCounter = document.getElementById("questionCounter");
+const questionTypeBadge = document.getElementById("questionTypeBadge");
 const questionText = document.getElementById("questionText");
 const optionsContainer = document.getElementById("optionsContainer");
 const feedbackBox = document.getElementById("feedbackBox");
 const wheelCanvas = document.getElementById("wheelCanvas");
-const timerWrap = document.getElementById("timerWrap");
-const timerText = document.getElementById("timerText");
-const timerProgress = document.getElementById("timerProgress");
 const ctx = wheelCanvas.getContext("2d");
 
-const TIMER_SECONDS = 30;
-const TIMER_RADIUS = 52;
-const TIMER_CIRCUMFERENCE = 2 * Math.PI * TIMER_RADIUS;
-timerProgress.style.strokeDasharray = `${TIMER_CIRCUMFERENCE}`;
-timerProgress.style.strokeDashoffset = "0";
-
 const state = {
+  selectedSemester: "",
   selectedClass: "",
   selectedLessonId: null,
   students: [],
@@ -38,9 +33,7 @@ const state = {
   currentQuestion: null,
   isSpinning: false,
   wheelRotation: 0,
-  audioContext: null,
-  timerValue: TIMER_SECONDS,
-  timerInterval: null
+  audioContext: null
 };
 
 initialize();
@@ -53,6 +46,10 @@ function initialize() {
 }
 
 function bindEvents() {
+  semesterSelect.addEventListener("change", () => {
+    fillLessonSelect();
+    onSelectionChange();
+  });
   classSelect.addEventListener("change", onSelectionChange);
   lessonSelect.addEventListener("change", onSelectionChange);
 
@@ -63,11 +60,12 @@ function bindEvents() {
 }
 
 function onSelectionChange() {
+  state.selectedSemester = semesterSelect.value;
   state.selectedClass = classSelect.value;
   state.selectedLessonId = Number(lessonSelect.value) || null;
   state.students = state.selectedClass ? [...(classesData[state.selectedClass] || [])] : [];
   state.lesson = state.selectedLessonId
-    ? lessonsData.find((lesson) => lesson.id === state.selectedLessonId) || null
+    ? (lessonsData[state.selectedSemester] || []).find((lesson) => lesson.id === state.selectedLessonId) || null
     : null;
 
   state.usedStudents = [];
@@ -97,7 +95,15 @@ function fillClassSelect() {
 }
 
 function fillLessonSelect() {
-  lessonsData.forEach((lesson) => {
+  lessonSelect.replaceChildren();
+  const semester = semesterSelect.value;
+  const placeholder = document.createElement("option");
+  placeholder.value = "";
+  placeholder.textContent = semester ? "اختر الدرس" : "اختر الفصل الدراسي أولاً";
+  lessonSelect.appendChild(placeholder);
+  lessonSelect.disabled = !semester;
+
+  (lessonsData[semester] || []).forEach((lesson) => {
     const option = document.createElement("option");
     option.value = lesson.id;
     option.textContent = `${lesson.id} - ${lesson.title}`;
@@ -106,15 +112,15 @@ function fillLessonSelect() {
 }
 
 function refreshButtons() {
-  const ready = Boolean(state.selectedClass && state.lesson && state.students.length);
+  const ready = Boolean(state.selectedSemester && state.selectedClass && state.lesson && state.students.length);
   spinBtn.disabled = !ready || state.isSpinning;
   newQuestionBtn.disabled = !(state.currentStudent && state.lesson);
   nextStudentBtn.disabled = !(state.lesson && state.students.length) || state.isSpinning;
 }
 
 function handleSpin() {
-  if (!state.selectedClass || !state.lesson) {
-    setFeedback("اختر الشعبة والدرس أولاً.", "error");
+  if (!state.selectedSemester || !state.selectedClass || !state.lesson) {
+    setFeedback("اختر الفصل الدراسي والشعبة والدرس أولاً.", "error");
     return;
   }
 
@@ -125,11 +131,13 @@ function handleSpin() {
 
   if (state.isSpinning) return;
 
-  if (!getAvailableStudents().length) {
+  const pool = getAvailableStudents();
+  if (!pool.length) {
     state.usedStudents = [];
   }
 
-  const chosenStudent = randomItem(getAvailableStudents());
+  const availableStudents = getAvailableStudents();
+  const chosenStudent = randomItem(availableStudents);
   if (!chosenStudent) return;
 
   animateWheel(chosenStudent);
@@ -138,6 +146,7 @@ function handleSpin() {
 function getAvailableStudents() {
   let available = state.students.filter((name) => !state.usedStudents.includes(name));
   if (!available.length) {
+    state.usedStudents = [];
     available = [...state.students];
   }
   return available;
@@ -158,22 +167,20 @@ function getAvailableQuestions() {
 
 function animateWheel(chosenStudent) {
   state.isSpinning = true;
-  stopTimer();
   refreshButtons();
   wheelStatus.textContent = "جاري الدوران...";
 
   const students = state.students;
   const selectedIndex = students.indexOf(chosenStudent);
   const segmentAngle = (Math.PI * 2) / students.length;
-  const targetAngle = students.length
-    ? (((-(selectedIndex * segmentAngle + (segmentAngle / 2))) % (Math.PI * 2)) + (Math.PI * 2)) % (Math.PI * 2)
-    : 0;
+  // Align the selected segment with the top red pointer, not the left side.
+  const targetAngle = -((selectedIndex + 0.5) * segmentAngle);
 
   const currentNormalized = ((state.wheelRotation % (Math.PI * 2)) + (Math.PI * 2)) % (Math.PI * 2);
   let delta = targetAngle - currentNormalized;
   while (delta < 0) delta += Math.PI * 2;
 
-  const extraSpins = Math.PI * 2 * (5 + Math.random() * 2.5);
+  const extraSpins = Math.PI * 2 * (5 + Math.floor(Math.random() * 3));
   const startRotation = state.wheelRotation;
   const endRotation = startRotation + delta + extraSpins;
   const duration = 4200;
@@ -205,7 +212,8 @@ function animateWheel(chosenStudent) {
 function showRandomQuestion() {
   if (!state.lesson) return;
 
-  const question = randomItem(getAvailableQuestions());
+  const availableQuestions = getAvailableQuestions();
+  const question = randomItem(availableQuestions);
   if (!question) return;
 
   state.currentQuestion = question;
@@ -215,8 +223,10 @@ function showRandomQuestion() {
 
   emptyQuestionState.classList.add("hidden");
   questionBox.classList.remove("hidden");
-  timerWrap.classList.remove("hidden");
 
+  questionCounter.textContent = `السؤال ${question.id} من ${state.lesson.questions.length}`;
+  questionTypeBadge.textContent =
+    question.type === "true_false" ? "صح أو خطأ" : "اختيار من متعدد";
   questionText.textContent = question.text;
 
   optionsContainer.innerHTML = "";
@@ -227,12 +237,11 @@ function showRandomQuestion() {
     const btn = document.createElement("button");
     btn.className = "option-btn";
     btn.type = "button";
-    btn.textContent = optionText;
+    btn.textContent = `${index + 1}) ${optionText}`;
     btn.addEventListener("click", () => checkAnswer(index, btn));
     optionsContainer.appendChild(btn);
   });
 
-  startTimer();
   refreshButtons();
 }
 
@@ -242,9 +251,9 @@ function checkAnswer(selectedIndex, clickedButton) {
   ensureAudio();
   const buttons = [...optionsContainer.querySelectorAll(".option-btn")];
   const correctIndex = state.currentQuestion.correctIndex;
+  const correctButton = buttons[correctIndex];
 
   if (selectedIndex === correctIndex) {
-    stopTimer();
     clickedButton.classList.add("correct");
     buttons.forEach((btn) => (btn.disabled = true));
     setFeedback("أحسنت، إجابة صحيحة.", "success");
@@ -258,44 +267,10 @@ function checkAnswer(selectedIndex, clickedButton) {
   clickedButton.disabled = true;
   setFeedback("فكّر جيدًا وحاول مرة أخرى.", "error");
   playFailSound();
-}
 
-function startTimer() {
-  stopTimer();
-  state.timerValue = TIMER_SECONDS;
-  updateTimerUI();
-  state.timerInterval = window.setInterval(() => {
-    state.timerValue -= 1;
-    updateTimerUI();
-
-    if (state.timerValue <= 0) {
-      stopTimer();
-      handleTimeUp();
-    }
-  }, 1000);
-}
-
-function stopTimer() {
-  if (state.timerInterval) {
-    clearInterval(state.timerInterval);
-    state.timerInterval = null;
+  if (correctButton) {
+    correctButton.classList.remove("correct");
   }
-}
-
-function updateTimerUI() {
-  timerText.textContent = String(state.timerValue);
-  const progress = state.timerValue / TIMER_SECONDS;
-  timerProgress.style.strokeDashoffset = String(TIMER_CIRCUMFERENCE * (1 - progress));
-  timerWrap.classList.toggle("warning", state.timerValue <= 10);
-}
-
-function handleTimeUp() {
-  const buttons = [...optionsContainer.querySelectorAll(".option-btn")];
-  buttons.forEach((btn) => (btn.disabled = true));
-  setFeedback("انتهى الوقت.", "error");
-  playFailSound();
-  newQuestionBtn.disabled = false;
-  nextStudentBtn.disabled = false;
 }
 
 function setFeedback(message, mode = "") {
@@ -307,14 +282,8 @@ function setFeedback(message, mode = "") {
 }
 
 function resetQuestionArea() {
-  stopTimer();
-  timerWrap.classList.add("hidden");
-  timerWrap.classList.remove("warning");
-  timerText.textContent = String(TIMER_SECONDS);
-  timerProgress.style.strokeDashoffset = "0";
   questionBox.classList.add("hidden");
   emptyQuestionState.classList.remove("hidden");
-  emptyQuestionState.innerHTML = "";
   questionText.textContent = "";
   optionsContainer.innerHTML = "";
   feedbackBox.className = "feedback-box";
@@ -324,7 +293,7 @@ function resetQuestionArea() {
 }
 
 function resetAll() {
-  stopTimer();
+  state.selectedSemester = "";
   state.selectedClass = "";
   state.selectedLessonId = null;
   state.students = [];
@@ -336,8 +305,9 @@ function resetAll() {
   state.isSpinning = false;
   state.wheelRotation = 0;
 
+  semesterSelect.value = "";
   classSelect.value = "";
-  lessonSelect.value = "";
+  fillLessonSelect();
   selectedStudentName.textContent = "—";
   lessonBadge.textContent = "لم يتم اختيار درس بعد";
   drawWheel(["اختر", "الشعبة", "والدرس"]);
@@ -345,11 +315,15 @@ function resetAll() {
 }
 
 function collectLessons() {
-  const keys = Array.from({ length: 15 }, (_, i) => `LESSON_${String(i + 1).padStart(2, "0")}`);
-  return keys
-    .map((key) => window[key])
-    .filter(Boolean)
-    .sort((a, b) => a.id - b.id);
+  // Use either separate S1 lesson files or a single questions-semester1.js bundle.
+  const semester1 = Array.isArray(window.S1_LESSONS)
+    ? window.S1_LESSONS
+    : Array.from({ length: 19 }, (_, i) => window[`S1_LESSON_${String(i + 1).padStart(2, "0")}`]);
+  const semester2 = Array.from({ length: 15 }, (_, i) => window[`LESSON_${String(i + 1).padStart(2, "0")}`]);
+  return {
+    "1": semester1.filter(Boolean).sort((a, b) => a.id - b.id),
+    "2": semester2.filter(Boolean).sort((a, b) => a.id - b.id)
+  };
 }
 
 function drawWheel(labels, rotation = 0) {
