@@ -20,6 +20,9 @@ const optionsContainer = document.getElementById("optionsContainer");
 const feedbackBox = document.getElementById("feedbackBox");
 const wheelCanvas = document.getElementById("wheelCanvas");
 const ctx = wheelCanvas.getContext("2d");
+// Track shown questions during the active browser-tab session, separately per semester and lesson.
+const QUESTION_HISTORY_KEY = "grade9_chemistry_questions_history_v2";
+const questionHistory = readQuestionHistory();
 
 const state = {
   selectedSemester: "",
@@ -28,7 +31,6 @@ const state = {
   students: [],
   lesson: null,
   usedStudents: [],
-  usedQuestions: [],
   currentStudent: "",
   currentQuestion: null,
   isSpinning: false,
@@ -42,7 +44,30 @@ function initialize() {
   fillClassSelect();
   fillLessonSelect();
   drawWheel(["اختر", "الشعبة", "والدرس"]);
+  // The middle circle used to be a drawing. Place a real, accessible button above it.
+  createWheelCenterButton();
+  // Never display the source question number or the question bank size.
+  questionCounter.hidden = true;
+  questionCounter.style.display = "none";
   bindEvents();
+  refreshButtons();
+}
+
+function createWheelCenterButton() {
+  const wheelCenterBtn = document.createElement("button");
+  wheelCenterBtn.id = "wheelCenterBtn";
+  wheelCenterBtn.type = "button";
+  wheelCenterBtn.textContent = "ابدأ";
+  wheelCenterBtn.setAttribute("aria-label", "اضغط لتدوير العجلة واختيار طالب");
+  wheelCenterBtn.title = "تدوير العجلة";
+  wheelCenterBtn.style.cssText = [
+    "position:absolute", "top:50%", "left:50%", "transform:translate(-50%,-50%)",
+    "height:88px", "width:88px", "border-radius:50%", "border:3px solid #fff",
+    "background:#1768d1", "color:white", "font:bold 20px Tahoma,Arial,sans-serif",
+    "box-shadow:0 3px 10px rgba(10,55,112,.25)", "z-index:4", "cursor:pointer"
+  ].join(";");
+  wheelCanvas.parentElement.appendChild(wheelCenterBtn);
+  wheelCenterBtn.addEventListener("click", handleSpin);
 }
 
 function bindEvents() {
@@ -63,13 +88,14 @@ function onSelectionChange() {
   state.selectedSemester = semesterSelect.value;
   state.selectedClass = classSelect.value;
   state.selectedLessonId = Number(lessonSelect.value) || null;
-  state.students = state.selectedClass ? [...(classesData[state.selectedClass] || [])] : [];
+  // Shuffle a COPY: never change students.js and never show names alphabetically.
+  state.students = state.selectedClass ? shuffleArray([...(classesData[state.selectedClass] || [])]) : [];
   state.lesson = state.selectedLessonId
     ? (lessonsData[state.selectedSemester] || []).find((lesson) => lesson.id === state.selectedLessonId) || null
     : null;
 
   state.usedStudents = [];
-  state.usedQuestions = [];
+  // Do NOT clear question history when changing class, semester, or lesson.
   state.currentStudent = "";
   state.currentQuestion = null;
 
@@ -114,8 +140,10 @@ function fillLessonSelect() {
 function refreshButtons() {
   const ready = Boolean(state.selectedSemester && state.selectedClass && state.lesson && state.students.length);
   spinBtn.disabled = !ready || state.isSpinning;
-  newQuestionBtn.disabled = !(state.currentStudent && state.lesson);
-  nextStudentBtn.disabled = !(state.lesson && state.students.length) || state.isSpinning;
+  const wheelCenterBtn = document.getElementById("wheelCenterBtn");
+  if (wheelCenterBtn) wheelCenterBtn.disabled = !ready || state.isSpinning;
+  newQuestionBtn.disabled = !(state.currentStudent && state.lesson) || state.isSpinning;
+  nextStudentBtn.disabled = !ready || state.isSpinning;
 }
 
 function handleSpin() {
@@ -131,11 +159,9 @@ function handleSpin() {
 
   if (state.isSpinning) return;
 
-  const pool = getAvailableStudents();
-  if (!pool.length) {
-    state.usedStudents = [];
-  }
-
+  // A fresh random wheel layout for every spin, including its starting position.
+  shuffleArray(state.students);
+  drawWheel(state.students, state.wheelRotation);
   const availableStudents = getAvailableStudents();
   const chosenStudent = randomItem(availableStudents);
   if (!chosenStudent) return;
@@ -152,17 +178,58 @@ function getAvailableStudents() {
   return available;
 }
 
-function getAvailableQuestions() {
-  let available = (state.lesson?.questions || []).filter(
-    (question) => !state.usedQuestions.includes(question.id)
-  );
+// Identify questions by their wording, not their numeric IDs (which may repeat in source files).
+function questionKey(question) {
+  return String(question?.text || "").replace(/\s+/g, " ").trim();
+}
 
-  if (!available.length) {
-    state.usedQuestions = [];
-    available = [...(state.lesson?.questions || [])];
+function lessonHistoryKey() {
+  return `${state.selectedSemester}:${state.selectedLessonId}`;
+}
+
+function getAvailableQuestions() {
+  if (!state.lesson) return [];
+  const lessonKey = lessonHistoryKey();
+  // Ignore identical question texts within a lesson to prevent accidental repeats.
+  const distinctQuestions = [];
+  const seenInBank = new Set();
+  for (const question of state.lesson.questions || []) {
+    const key = questionKey(question);
+    if (!key || seenInBank.has(key)) continue;
+    seenInBank.add(key);
+    distinctQuestions.push(question);
   }
 
-  return available;
+  const used = new Set(questionHistory[lessonKey] || []);
+  const available = distinctQuestions.filter((q) => !used.has(questionKey(q)));
+  if (available.length) return available;
+
+  // Every distinct question was shown: start a new cycle, avoiding an instant
+  // repeat of the last shown question when possible.
+  const previous = (questionHistory[lessonKey] || []).at(-1);
+  questionHistory[lessonKey] = [];
+  saveQuestionHistory();
+  if (distinctQuestions.length > 1 && previous) {
+    return distinctQuestions.filter((q) => questionKey(q) !== previous);
+  }
+  return distinctQuestions;
+}
+
+function readQuestionHistory() {
+  try {
+    const history = JSON.parse(sessionStorage.getItem(QUESTION_HISTORY_KEY) || "{}");
+    return history && typeof history === "object" && !Array.isArray(history) ? history : {};
+  } catch (_) {
+    return {};
+  }
+}
+
+function saveQuestionHistory() {
+  try {
+    sessionStorage.setItem(QUESTION_HISTORY_KEY, JSON.stringify(questionHistory));
+  } catch (_) {
+    // In private browsing contexts without storage, in-memory tracking still works.
+  }
 }
 
 function animateWheel(chosenStudent) {
@@ -217,14 +284,17 @@ function showRandomQuestion() {
   if (!question) return;
 
   state.currentQuestion = question;
-  if (!state.usedQuestions.includes(question.id)) {
-    state.usedQuestions.push(question.id);
+  const lessonKey = lessonHistoryKey();
+  if (!Array.isArray(questionHistory[lessonKey])) questionHistory[lessonKey] = [];
+  const key = questionKey(question);
+  if (!questionHistory[lessonKey].includes(key)) {
+    questionHistory[lessonKey].push(key);
+    saveQuestionHistory();
   }
 
   emptyQuestionState.classList.add("hidden");
   questionBox.classList.remove("hidden");
 
-  questionCounter.textContent = `السؤال ${question.id} من ${state.lesson.questions.length}`;
   questionTypeBadge.textContent =
     question.type === "true_false" ? "صح أو خطأ" : "اختيار من متعدد";
   questionText.textContent = question.text;
@@ -299,7 +369,9 @@ function resetAll() {
   state.students = [];
   state.lesson = null;
   state.usedStudents = [];
-  state.usedQuestions = [];
+  // "إعادة ضبط كاملة" clears all session question history too.
+  for (const key of Object.keys(questionHistory)) delete questionHistory[key];
+  saveQuestionHistory();
   state.currentStudent = "";
   state.currentQuestion = null;
   state.isSpinning = false;
@@ -383,6 +455,15 @@ function shortenText(text, maxLength) {
 function randomItem(array) {
   if (!array.length) return null;
   return array[Math.floor(Math.random() * array.length)];
+}
+
+// In-place Fisher-Yates shuffle. Each arrangement is independent of Arabic name order.
+function shuffleArray(array) {
+  for (let i = array.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [array[i], array[j]] = [array[j], array[i]];
+  }
+  return array;
 }
 
 function ensureAudio() {
