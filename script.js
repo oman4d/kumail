@@ -20,6 +20,14 @@ const optionsContainer = document.getElementById("optionsContainer");
 const feedbackBox = document.getElementById("feedbackBox");
 const wheelCanvas = document.getElementById("wheelCanvas");
 const ctx = wheelCanvas.getContext("2d");
+
+// A 30-second circular timer is injected here so index.html and style.css stay unchanged.
+const TIMER_SECONDS = 30;
+const TIMER_RADIUS = 52;
+const TIMER_CIRCUMFERENCE = 2 * Math.PI * TIMER_RADIUS;
+let timerWrap;
+let timerText;
+let timerProgress;
 // Track shown questions during the active browser-tab session, separately per semester and lesson.
 const QUESTION_HISTORY_KEY = "grade9_chemistry_questions_history_v2";
 const questionHistory = readQuestionHistory();
@@ -35,7 +43,11 @@ const state = {
   currentQuestion: null,
   isSpinning: false,
   wheelRotation: 0,
-  audioContext: null
+  audioContext: null,
+  wrongAttempts: 0,
+  questionResolved: false,
+  timerInterval: null,
+  timerDeadline: 0
 };
 
 initialize();
@@ -46,6 +58,7 @@ function initialize() {
   drawWheel(["اختر", "الشعبة", "والدرس"]);
   // The middle circle used to be a drawing. Place a real, accessible button above it.
   createWheelCenterButton();
+  createQuestionTimer();
   // Never display the source question number or the question bank size.
   questionCounter.hidden = true;
   questionCounter.style.display = "none";
@@ -68,6 +81,121 @@ function createWheelCenterButton() {
   ].join(";");
   wheelCanvas.parentElement.appendChild(wheelCenterBtn);
   wheelCenterBtn.addEventListener("click", handleSpin);
+}
+
+function createQuestionTimer() {
+  const tools = document.createElement("div");
+  tools.className = "grade9-question-header-tools";
+  lessonBadge.before(tools);
+  tools.appendChild(lessonBadge);
+
+  timerWrap = document.createElement("div");
+  timerWrap.id = "timerWrap";
+  timerWrap.className = "grade9-timer";
+  timerWrap.setAttribute("role", "timer");
+  timerWrap.setAttribute("aria-label", "الوقت المتبقي للإجابة");
+  timerWrap.hidden = true;
+  timerWrap.innerHTML = `
+    <svg class="grade9-timer-svg" viewBox="0 0 120 120" aria-hidden="true">
+      <circle class="grade9-timer-track" cx="60" cy="60" r="52"></circle>
+      <circle id="timerProgress" class="grade9-timer-progress" cx="60" cy="60" r="52"></circle>
+    </svg>
+    <span id="timerText" class="grade9-timer-text">30</span>
+  `;
+  tools.prepend(timerWrap);
+  timerText = timerWrap.querySelector("#timerText");
+  timerProgress = timerWrap.querySelector("#timerProgress");
+  timerProgress.style.strokeDasharray = String(TIMER_CIRCUMFERENCE);
+  timerProgress.style.strokeDashoffset = "0";
+
+  const style = document.createElement("style");
+  style.id = "grade9-question-timer-styles";
+  style.textContent = `
+    .grade9-question-header-tools { display:flex; align-items:center; gap:12px; min-width:0; }
+    .grade9-timer[hidden] { display:none !important; }
+    .grade9-timer { width:68px; height:68px; position:relative; flex:none; display:grid;
+      place-items:center; font:bold 21px Tahoma,Arial,sans-serif; color:#1768d1; }
+    .grade9-timer-svg { position:absolute; inset:0; width:100%; height:100%; transform:rotate(-90deg); }
+    .grade9-timer-track { fill:none; stroke:#e0eaf5; stroke-width:9; }
+    .grade9-timer-progress { fill:none; stroke:#1768d1; stroke-width:9; stroke-linecap:round;
+      transition:stroke-dashoffset .12s linear; }
+    .grade9-timer-text { position:relative; direction:ltr; font-variant-numeric:tabular-nums; }
+    .grade9-timer.grade9-timer-warning { color:#c2410c; }
+    .grade9-timer.grade9-timer-warning .grade9-timer-progress { stroke:#ea580c; }
+    .option-btn.grade9-reveal-answer, .option-btn.grade9-reveal-answer:disabled {
+      opacity:1; background:#dcfce7; border:3px solid #16a34a; color:#14532d;
+      animation:grade9-correct-flash .8s ease-in-out infinite;
+    }
+    @keyframes grade9-correct-flash {
+      0%,100% { background:#dcfce7; box-shadow:0 0 0 0 rgba(22,163,74,.2); }
+      50% { background:#86efac; box-shadow:0 0 0 6px rgba(22,163,74,.25); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .option-btn.grade9-reveal-answer { animation:none; outline:3px solid #16a34a; }
+    }
+    @media (max-width:720px) {
+      .grade9-question-header-tools { gap:7px; flex-wrap:wrap; justify-content:flex-start; }
+      .grade9-timer { width:60px; height:60px; font-size:19px; }
+    }
+  `;
+  document.head.appendChild(style);
+}
+
+function updateQuestionTimer(seconds) {
+  timerText.textContent = String(seconds);
+  timerProgress.style.strokeDashoffset = String(TIMER_CIRCUMFERENCE * (1 - seconds / TIMER_SECONDS));
+  timerWrap.classList.toggle("grade9-timer-warning", seconds <= 10);
+}
+
+function stopQuestionTimer() {
+  if (state.timerInterval !== null) {
+    clearInterval(state.timerInterval);
+    state.timerInterval = null;
+  }
+}
+
+function hideQuestionTimer() {
+  stopQuestionTimer();
+  if (timerWrap) {
+    timerWrap.hidden = true;
+    timerWrap.classList.remove("grade9-timer-warning");
+    updateQuestionTimer(TIMER_SECONDS);
+  }
+}
+
+function startQuestionTimer() {
+  stopQuestionTimer();
+  updateQuestionTimer(TIMER_SECONDS);
+  timerWrap.hidden = false;
+  state.timerDeadline = performance.now() + TIMER_SECONDS * 1000;
+  state.timerInterval = window.setInterval(() => {
+    // Use elapsed time rather than counting interval ticks, even if the tab was suspended.
+    const remaining = Math.max(0, Math.ceil((state.timerDeadline - performance.now()) / 1000));
+    updateQuestionTimer(remaining);
+    if (remaining === 0) {
+      stopQuestionTimer();
+      if (!state.questionResolved && !state.isSpinning) {
+        revealCorrectAnswer("انتهى الوقت. الإجابة الصحيحة تومض أمامك.");
+        ensureAudio();
+        playFailSound();
+      }
+    }
+  }, 100);
+}
+
+function revealCorrectAnswer(message) {
+  if (!state.currentQuestion || state.questionResolved) return;
+  state.questionResolved = true;
+  stopQuestionTimer();
+  const buttons = [...optionsContainer.querySelectorAll(".option-btn")];
+  buttons.forEach((btn) => (btn.disabled = true));
+  const correctButton = buttons[state.currentQuestion.correctIndex];
+  if (correctButton) {
+    correctButton.classList.add("correct", "grade9-reveal-answer");
+  }
+  setFeedback(message, "error");
+  newQuestionBtn.disabled = false;
+  nextStudentBtn.disabled = false;
 }
 
 function bindEvents() {
@@ -233,6 +361,7 @@ function saveQuestionHistory() {
 }
 
 function animateWheel(chosenStudent) {
+  hideQuestionTimer();
   state.isSpinning = true;
   refreshButtons();
   wheelStatus.textContent = "جاري الدوران...";
@@ -278,6 +407,9 @@ function animateWheel(chosenStudent) {
 
 function showRandomQuestion() {
   if (!state.lesson) return;
+  stopQuestionTimer();
+  state.wrongAttempts = 0;
+  state.questionResolved = false;
 
   const availableQuestions = getAvailableQuestions();
   const question = randomItem(availableQuestions);
@@ -312,18 +444,20 @@ function showRandomQuestion() {
     optionsContainer.appendChild(btn);
   });
 
+  startQuestionTimer();
   refreshButtons();
 }
 
 function checkAnswer(selectedIndex, clickedButton) {
-  if (!state.currentQuestion) return;
+  if (!state.currentQuestion || state.questionResolved || state.isSpinning || clickedButton.disabled) return;
 
   ensureAudio();
   const buttons = [...optionsContainer.querySelectorAll(".option-btn")];
   const correctIndex = state.currentQuestion.correctIndex;
-  const correctButton = buttons[correctIndex];
 
   if (selectedIndex === correctIndex) {
+    state.questionResolved = true;
+    stopQuestionTimer();
     clickedButton.classList.add("correct");
     buttons.forEach((btn) => (btn.disabled = true));
     setFeedback("أحسنت، إجابة صحيحة.", "success");
@@ -333,13 +467,15 @@ function checkAnswer(selectedIndex, clickedButton) {
     return;
   }
 
+  state.wrongAttempts += 1;
   clickedButton.classList.add("wrong");
   clickedButton.disabled = true;
-  setFeedback("فكّر جيدًا وحاول مرة أخرى.", "error");
   playFailSound();
 
-  if (correctButton) {
-    correctButton.classList.remove("correct");
+  if (state.wrongAttempts === 1) {
+    setFeedback("إجابة غير صحيحة. لديك محاولة ثانية.", "error");
+  } else {
+    revealCorrectAnswer("انتهت المحاولتان. الإجابة الصحيحة تومض أمامك.");
   }
 }
 
@@ -352,6 +488,9 @@ function setFeedback(message, mode = "") {
 }
 
 function resetQuestionArea() {
+  hideQuestionTimer();
+  state.wrongAttempts = 0;
+  state.questionResolved = false;
   questionBox.classList.add("hidden");
   emptyQuestionState.classList.remove("hidden");
   questionText.textContent = "";
